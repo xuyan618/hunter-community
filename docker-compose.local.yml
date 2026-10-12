@@ -19,6 +19,11 @@ services:
   api:
     environment:
       TZ: Asia/Shanghai
+      # 扫描源 / LLM 出网代理:局域网内可出国际的代理节点。
+      # 容器经此访问 scanner.tradingview.com(境外域名,直连被墙)。
+      # 内部服务(postgres/redis/api 等)已由基础文件的 NO_PROXY 排除,不受影响。
+      HTTP_PROXY: http://10.98.136.132:7897
+      HTTPS_PROXY: http://10.98.136.132:7897
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -27,6 +32,23 @@ services:
   postgres:
     environment:
       TZ: Asia/Shanghai
+    # 调优:回测对 factor_value(1476 万行)做 GROUP BY 聚合时,默认 /dev/shm 仅 64M
+    # 起不了并行 worker、shared_buffers 也装不下索引,单线程全扫很慢。加大 shm 并提内存/并行。
+    shm_size: "1gb"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=2GB"
+      - "-c"
+      - "effective_cache_size=6GB"
+      - "-c"
+      - "max_parallel_workers_per_gather=4"
+      - "-c"
+      - "max_parallel_workers=8"
+      - "-c"
+      - "work_mem=64MB"
+      - "-c"
+      - "maintenance_work_mem=512MB"
   redis:
     environment:
       TZ: Asia/Shanghai
