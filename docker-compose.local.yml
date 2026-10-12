@@ -1,0 +1,41 @@
+# 本地部署覆盖文件（本地使用，不提交到仓库）。
+#
+# 与 docker-compose.dev.yml 叠加，做「真·从源码构建 + 中国时区 + 国内 PyPI 镜像」部署：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up -d --build
+#
+# 本文件做三件事：
+#   1. 给全部 6 个服务注入 TZ=Asia/Shanghai（容器内日志走中国时区）。
+#   2. 给 api 构建传入 PIP_INDEX_URL=aliyun PyPI 镜像（默认 pypi.org 在本环境部分包拉不到）。
+#      apps/api/Dockerfile 里该值默认空，不影响其他环境。
+#   3. 把全部基础镜像按规范名打本地标签（避免 docker build 去 docker.io 超时），见文件末尾说明。
+#
+# ⚠️ 前置：服务器需已把基础镜像按规范名打本地标签：
+#   docker tag docker.m.daocloud.io/library/python:3.11-slim python:3.11-slim
+#   docker tag docker.m.daocloud.io/library/python:3.12-alpine python:3.12-alpine
+#   docker tag docker.m.daocloud.io/library/node:22-alpine node:22-alpine
+#   docker tag docker.m.daocloud.io/library/node:22-slim node:22-slim
+#   docker tag ghcr.nju.edu.cn/agentpit-io/hunter-opencode:1.18.12-slim.1 ghcr.io/agentpit-io/hunter-opencode:1.18.12-slim.1
+services:
+  api:
+    environment:
+      TZ: Asia/Shanghai
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        PIP_INDEX_URL: "https://mirrors.aliyun.com/pypi/simple"
+  postgres:
+    environment:
+      TZ: Asia/Shanghai
+  redis:
+    environment:
+      TZ: Asia/Shanghai
+  web:
+    environment:
+      TZ: Asia/Shanghai
+  llm-shim:
+    environment:
+      TZ: Asia/Shanghai
+  opencode:
+    environment:
+      TZ: Asia/Shanghai

@@ -1,0 +1,10 @@
+# web 服务构建上下文是 ./apps/web（不是仓库根），
+# 仓库根 .dockerignore 的 **/node_modules 等规则在这里不生效，必须单独声明。
+# 否则 COPY . . 会把本地的 node_modules 当成文件去覆盖镜像里已装好的目录，
+# 报 "cannot replace to directory .../node_modules with file"。
+
+node_modules
+.next
+Dockerfile
+.dockerignore
+npm-debug.log

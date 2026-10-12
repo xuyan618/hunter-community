@@ -24,6 +24,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
+# Alpine apk 源走 HTTPS（http 出口被中间设备拦截时 build 会失败）
+RUN for f in $(grep -rl 'http://dl-cdn.alpinelinux.org' /etc/apk 2>/dev/null); do sed -i 's#http://dl-cdn.alpinelinux.org#https://dl-cdn.alpinelinux.org#g' "$f"; done
 RUN apk add --no-cache curl && \
     addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001

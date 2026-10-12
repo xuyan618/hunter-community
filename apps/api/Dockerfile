@@ -24,6 +24,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # 有些包没有对应平台的 wheel 时要就地编译(arm64 上尤其常见),所以 builder 里
 # 该给的编译工具还是得给 —— 只是不再让它们进运行层。
+# 构建环境 apt 源走 HTTPS（http 出口被中间设备拦截时 build 会失败）
+RUN for f in $(grep -rl 'http://deb.debian.org' /etc/apt 2>/dev/null); do sed -i 's#http://deb.debian.org#https://deb.debian.org#g' "$f"; done
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
@@ -34,6 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+ARG PIP_INDEX_URL
+ENV PIP_INDEX_URL=$PIP_INDEX_URL
 COPY apps/api/requirements.txt ./
 RUN pip install -r requirements.txt
 
@@ -49,6 +53,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # curl · HEALTHCHECK
 # tesseract-ocr · OCR 底层 · chi-sim=中文简体 · eng=英文(混排常见) · 用户上传截图批量加自选走这条链
 # 注意:psycopg2-binary 自带 libpq,所以运行层不需要 libpq-dev / libpq5。
+# 构建环境 apt 源走 HTTPS（http 出口被中间设备拦截时 build 会失败）
+RUN for f in $(grep -rl 'http://deb.debian.org' /etc/apt 2>/dev/null); do sed -i 's#http://deb.debian.org#https://deb.debian.org#g' "$f"; done
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
