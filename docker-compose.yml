@@ -16,14 +16,12 @@
 #    静态数据、迁移 SQL、MCP 脚本、插件)都已经打进镜像;挂载会让镜像
 #    在没有仓库目录的环境(云平台 / K8s)里起不来。
 
-name: hunter-community
-
 x-restart: &restart
   restart: unless-stopped
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${REGISTRY_MIRROR:-}postgres:16-alpine
     <<: *restart
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-hunter}
@@ -46,7 +44,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: ${REGISTRY_MIRROR:-}redis:7-alpine
     <<: *restart
     ports:
       - "${REDIS_HOST_PORT:-6479}:6379"
