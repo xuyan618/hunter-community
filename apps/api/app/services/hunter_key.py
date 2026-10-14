@@ -178,7 +178,7 @@ async def manifest(key: str = "") -> dict:
         }
     headers = {"Authorization": f"Bearer {k}"}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as c:
+        async with httpx.AsyncClient(timeout=10.0, trust_env=True) as c:
             r = await c.get(f"{manifest_base()}/api/saas/tools/manifest", headers=headers)
         if r.status_code >= 500:
             raise RuntimeError(f"upstream {r.status_code}")

@@ -23,7 +23,7 @@ DEPLOY_HOST="${DEPLOY_HOST:-10.98.136.105}"
 DEPLOY_USER="${DEPLOY_USER:-xuyan}"
 DEPLOY_PATH="${DEPLOY_PATH:-/Users/xuyan/Desktop/hunter-community}"
 LOCAL_REPO="${LOCAL_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
-SOURCE_SERVICES=(api web opencode llm-shim)
+SOURCE_SERVICES=(api web opencode llm-shim paper fin-worker)
 
 # SSHPASS：优先环境变量，其次 deploy/.deploy-secrets
 if [ -z "${SSHPASS:-}" ] && [ -f "$(dirname "$0")/.deploy-secrets" ]; then
@@ -98,6 +98,10 @@ sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   ensure node:22-slim           docker.m.daocloud.io/library/node:22-slim
   ensure ghcr.io/agentpit-io/hunter-opencode:1.18.12-slim.1 \
          ghcr.nju.edu.cn/agentpit-io/hunter-opencode:1.18.12-slim.1
+  # fin 调度需要 Temporal 服务端(docker.io 官方镜像)。本地没有就从 daocloud 镜像源
+  # tag,都没有就走 docker pull(经 daemon 镜像加速);仍拉不到则脚本报错退出。
+  ensure temporalio/auto-setup:1.25 docker.m.daocloud.io/temporalio/auto-setup:1.25
+  ensure temporalio/ui:2.34.0        docker.m.daocloud.io/temporalio/ui:2.34.0
 
   echo "$(date '+%H:%M:%S')   -- 构建源码镜像（分层缓存，仅改动层重跑；npm 等若需联网请确认服务器可达）--"
   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml \
@@ -114,13 +118,15 @@ sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up -d
 REMOTE
 
-# ─── 4) 健康检查 ───────────────────────────────────────
-echo "$(ts) ==> [4/4] 健康检查（等待 api 变为 healthy）"
+# ─── 4) 健康检查 + 启用官方 fin 调度 ──────────────────
+echo "$(ts) ==> [4/4] 健康检查（等待 api 变为 healthy）并启用官方 fin 调度"
 sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   DEPLOY_PATH="$DEPLOY_PATH" bash -s <<'REMOTE'
   export PATH=/usr/local/bin:$PATH
   export DOCKER_HOST=unix:///Users/xuyan/.docker/run/docker.sock
   cd "$DEPLOY_PATH"
+  COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml"
+
   CID=$(docker compose ps -q api)
   for i in $(seq 1 12); do
     S=$(docker inspect -f '{{.State.Health.Status}}' "$CID" 2>/dev/null || echo unknown)
@@ -128,10 +134,33 @@ sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
     [ "$S" = "healthy" ] && break
     sleep 5
   done
+
+  # ── fin 调度前置 ──
+  # 1) 等账本角色 fin_paper_rw 被 api 启动期 migrate 建好(否则 ALTER ROLE 报
+  #    role does not exist)。该角色由 0023_fin_core.sql 建(无密码),密码由下面 provision。
+  PG_USER="$(grep '^POSTGRES_USER=' .env 2>/dev/null | cut -d= -f2-)"; PG_USER="${PG_USER:-hunter}"
+  echo "$(date '+%H:%M:%S')   -- 等待角色 fin_paper_rw --"
+  for i in $(seq 1 60); do
+    docker compose exec -T postgres psql -U "$PG_USER" -tAc \
+      "SELECT 1 FROM pg_roles WHERE rolname='fin_paper_rw'" 2>/dev/null | grep -q 1 && { echo "     role ready"; break; }
+    sleep 3
+  done
+  # 2) 确保 .env 有 FIN_PAPER_PASSWORD(没有则生成随机值,幂等 provision)
+  if ! grep -q '^FIN_PAPER_PASSWORD=' .env 2>/dev/null; then
+    printf 'FIN_PAPER_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+    echo "$(date '+%H:%M:%S')   -- 已为 .env 生成随机 FIN_PAPER_PASSWORD --"
+  fi
+  bash scripts/fin_provision_paper_role.sh
+  # 3) 起官方智能炒股调度(paper + temporal + temporal-ui + fin-worker)
+  echo "$(date '+%H:%M:%S')   -- 启动 fin 调度(profile=fin) --"
+  docker compose $COMPOSE_FILES up -d --profile fin
+
   echo "  -- 服务状态 --"
   docker compose ps
+  echo "  -- fin 调度状态 --"
+  docker compose $COMPOSE_FILES --profile fin ps
   echo "  -- api 日志尾部 --"
   docker logs --tail 8 "$CID" 2>&1 | sed 's/^/     /'
 REMOTE
 
-echo "==> 完成。本机源码已通过本地构建部署到服务器（未推送任何镜像库）。"
+echo "==> 完成。本机源码已通过本地构建部署到服务器（未推送任何镜像库），并已启用官方 fin 调度。"

@@ -127,13 +127,19 @@ def get_financial_summary(code: str, trade_date: date) -> dict | None:
         except (TypeError, ValueError):
             return default
 
+    # 毛利率兜底：akshare 的「销售毛利率(%)」上游常整列为空（实测 0/10 非空），
+    # 用会计恒等式 毛利率 = 100 − 主营业务成本率 补（该列实测 10/10 有值）。
+    _gm = _f("销售毛利率(%)")
+    if _gm is None:
+        _cost = _f("主营业务成本率(%)")
+        _gm = None if _cost is None else 100 - _cost
     return {
         "report_date": str(r.get("日期")),
         "eps": _f("摊薄每股收益(元)"),
         "bps": _f("每股净资产_调整前(元)") or _f("每股净资产_调整后(元)"),
         "roe_pct": _f("净资产收益率(%)"),
         "roa_pct": _f("总资产利润率(%)"),
-        "gross_margin_pct": _f("销售毛利率(%)"),
+        "gross_margin_pct": _gm,
         "net_margin_pct": _f("销售净利率(%)"),
         "debt_ratio_pct": _f("资产负债率(%)"),
         "revenue_growth_pct": _f("主营业务收入增长率(%)"),
@@ -185,6 +191,46 @@ get_gross_margin = _percent_field("gross_margin_pct")
 get_debt_ratio = _percent_field("debt_ratio_pct")
 get_revenue_growth = _percent_field("revenue_growth_pct")
 get_earnings_growth = _percent_field("earnings_growth_pct")
+
+
+def get_gross_margin_ap(code: str, trade_date: date) -> float | None:
+    """毛利率 · Agent Pit（finance-data 网关）/api/v1/financial/{sym} 优先源。
+
+    取 trade_date **已公告**（m_anntime ≤ trade_date）最新报告期的
+    `sales_gross_profit`（上游是百分数，这里 ÷100 转小数，与 get_gross_margin 口径一致）。
+    银行/证券等 `sales_gross_profit` 为 None 的（毛利率无意义）自然返回 None。
+    无 key / 无数据返 None，由调用方回落 akshare 成本率兜底。
+    """
+    from app.services import finance_data_client as fdc
+    sym = fdc.to_symbol(code)
+    if not sym:
+        return None
+    rows = fdc._get(f"/api/v1/financial/{sym}")
+    if not isinstance(rows, list) or not rows:
+        return None
+    best = None
+    best_ad = None
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        an = str(r.get("m_anntime") or "")[:10]
+        try:
+            ad = date.fromisoformat(an)
+        except ValueError:
+            continue
+        if ad > trade_date:
+            continue
+        if best_ad is None or ad > best_ad:
+            best, best_ad = r, ad
+    if best is None:
+        return None
+    try:
+        fv = float(best.get("sales_gross_profit"))
+    except (TypeError, ValueError):
+        return None
+    if fv != fv:
+        return None
+    return fv / 100.0 if abs(fv) > 1.0 else fv
 
 
 # ═════════════════════════════════════════════════════════════════════════

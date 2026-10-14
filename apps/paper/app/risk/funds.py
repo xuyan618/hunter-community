@@ -65,3 +65,31 @@ def check_funds(
         return RiskResult.pass_(NAME, position_qty=position_qty)
 
     return RiskResult.reject(NAME, f"无法识别的买卖方向 {side!r}")
+
+
+def check_min_order_amount(
+    side: str,
+    amount,
+    min_order_amount,
+    *,
+    currency=None,
+) -> RiskResult:
+    """第 7 条 · 单笔买入下限（档位级金额约束，来自 fin_param.order_limits）。
+
+    只约束**买入**；卖出不设下限。`min_order_amount` 缺省 / ≤0 / 非买入 → 直接通过
+    （不为难老调用方与没配下限的市场）。由 matching/engine 从 fin_param 取后传入。
+    """
+    if side != "buy":
+        return RiskResult.pass_(NAME)
+    lo = Decimal(str(min_order_amount))
+    amt = Decimal(str(amount))
+    if lo <= 0:
+        return RiskResult.pass_(NAME, amount=str(amt))
+    if amt < lo:
+        unit = money_label(currency)
+        return RiskResult.reject(
+            NAME,
+            f"单笔买入金额 {amt} {unit} 低于下限 {lo} {unit}",
+            amount=str(amt), min_order_amount=str(lo), currency=str(currency or "CNY"),
+        )
+    return RiskResult.pass_(NAME, amount=str(amt), min_order_amount=str(lo))

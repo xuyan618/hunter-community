@@ -20,6 +20,15 @@ import { MarketSwitcher, MarketStatusLine, useCurrentMarket, useMarketStatus, cu
 import { Grid, RowKV, SectionTitle, TimelineItem, EmptyState, ErrorState, LoadingCard } from '../_parts'
 import { useFinPage, finPost } from '../_data'
 
+// 后端 created_at 是 UTC（ISO 带 Z）；本页展示统一按上海时间（用户所在时区），
+// 否则直接 slice(11,16) 会切出 UTC 的 HH:MM（如 02:08 实为北京 10:08）。
+function shHHMM(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
+}
+
 type Strategy = { key: string; name: string; version: string; params: Record<string, number>; active?: boolean }
 type TierPreset = { label: string; values: Record<string, number>; fields: Record<string, string> }
 type AutoTrade = {
@@ -279,7 +288,7 @@ export default function FinanceAutoTradePage() {
                   + (data.recent_actions?.[0]?.created_at ? `最近一次动作在 ${String(data.recent_actions[0].created_at).slice(0, 10)}，可以到「我的账户」页看成交明细。` : '')} />
             ) : data.today.actions.map((o: any) => (
               <TimelineItem key={o.order_id + (o.trade_id || '')}
-                time={o.created_at?.slice(11, 16) || '—'}
+                time={shHHMM(o.created_at)}
                 title={<>
                   {o.outcome === 'declined' ? '放弃' : o.outcome === 'open' ? '挂着' : ''}
                   {o.side === 'buy' ? '买入' : '卖出'} {o.name || o.code}{' '}

@@ -124,6 +124,24 @@ def _compute_roe(codes: list[str], trade_date: date) -> dict[str, float]:
     return out
 
 
+def _compute_gross_margin(codes: list[str], trade_date: date) -> dict[str, float]:
+    """毛利率 · Agent Pit（finance-data 财务指标）优先，AKShare 成本率兜底。
+
+    原实现读 financial_metric.gross_margin（本地未落库 → 0 行）；AKShare 直连的
+    「销售毛利率」上游又整列为空。故：优先 Agent Pit /api/v1/financial 的
+    sales_gross_profit，取不到再回落 AKShare（毛利率 = 100 − 主营业务成本率）。
+    """
+    from app.services.quant import akshare_client as akc
+    out: dict[str, float] = {}
+    for code in codes:
+        gm = akc.get_gross_margin_ap(code, trade_date)
+        if gm is None:
+            gm = akc.get_gross_margin(code, trade_date)
+        if gm is not None and -2 < gm < 2:
+            out[code] = gm
+    return out
+
+
 # ═══════════════════════════════════════════════════════════════
 # B2 · 6 财务因子(akshare_client 已有 helper · 一次批发)
 # ═══════════════════════════════════════════════════════════════
@@ -959,7 +977,7 @@ COMPUTERS = {
     # 这四个已落库(financial_metric),走本地读 —— 不联网、几秒算完。
     # 上游给的是百分数,scale=0.01 转小数
     "roa": _make_db_factor("roa", 0.01, lo=-1, hi=1),
-    "gross_margin": _make_db_factor("gross_margin", 0.01, lo=-2, hi=2),
+    "gross_margin": _compute_gross_margin,
     "debt_ratio_inv": _compute_debt_ratio_inv,
     "revenue_growth_yoy": _make_db_factor("revenue_growth_yoy", 0.01, lo=-10, hi=50),
     "earnings_growth_yoy": _make_db_factor("earnings_growth_yoy", 0.01, lo=-10, hi=50),

@@ -55,6 +55,9 @@ services:
     build:
       context: ./apps/paper
       dockerfile: Dockerfile
+      args:
+        # 本机 build 时 pypi.org 部分包拉不到,走阿里云镜像
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple
     volumes:
       - ./apps/paper/app:/app/app:ro
 
@@ -66,6 +69,9 @@ services:
     build:
       context: ./apps/fin-worker
       dockerfile: Dockerfile
+      args:
+        # 本机 build 时 pypi.org 部分包拉不到,走阿里云镜像
+        PIP_INDEX_URL: https://mirrors.aliyun.com/pypi/simple
     volumes:
       - ./apps/fin-worker/app:/app/app:ro
 

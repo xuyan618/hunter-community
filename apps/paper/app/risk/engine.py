@@ -49,6 +49,7 @@ class RiskInputs:
     market: str = DEFAULT_MARKET       # CN_A / HK / US
     market_rule: Optional[dict] = None # fin_market_rule 的一行（六条规则的参数来源）
     tick: Optional[Decimal] = None     # 最小变动价位（app.tick 解析；None→按分，与改前一致）
+    min_order_amount: Optional[Decimal] = None  # 单笔买入下限（fin_param.order_limits·只对 A 股给值；第 7 条）
 
 
 @dataclass
@@ -134,6 +135,14 @@ def evaluate(inp: RiskInputs) -> RiskOutcome:
                 currency=rule.get("currency"),
             )
         )
+        # 第 7 条 · 单笔买入下限（fin_param.order_limits·只对 A 股给值；缺省不校验）
+        min_amt = getattr(inp, "min_order_amount", None)
+        if min_amt is not None and amount is not None:
+            results.append(
+                funds_mod.check_min_order_amount(
+                    inp.side, amount, min_amt, currency=rule.get("currency"),
+                )
+            )
 
     return RiskOutcome(
         passed=all(r.ok for r in results),

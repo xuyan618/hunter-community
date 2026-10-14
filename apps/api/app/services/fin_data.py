@@ -519,9 +519,18 @@ def quote(code: str) -> Optional[dict]:
     # 港美股那条链把腾讯排在前面：走到这里说明腾讯刚刚已经失败过一次，不再重复打
     # （一次 5 秒超时；degraded 状态下不打两次）。
     tencent_already_failed = market != "a"
-    if _is_date_only(hit.get("event_time")) or (market == "a" and name_missing):
+    _et = hit.get("event_time")
+    if (_et is None or _is_date_only(_et)) or (market == "a" and name_missing):
         tq = {} if tencent_already_failed else (_tencent_quote(code) or {})
-        if _is_date_only(hit.get("event_time")):
+        if _et is None:
+            # 官方**完全没给**时刻（不是 date-only）：也用腾讯通道补盘中时刻。
+            if tq.get("event_time"):
+                hit["event_time"] = tq["event_time"]
+                gaps.append(f"event_time: {hit.get('source')} 未给出行情时刻，"
+                            f"盘中时刻取自腾讯通道（{tq['event_time'].isoformat()}）")
+            else:
+                gaps.append("event_time: 官方未给出行情时刻，且腾讯通道也取不到盘中时刻")
+        elif _is_date_only(_et):
             if tq.get("event_time") and not _is_date_only(tq["event_time"]):
                 hit["event_time"] = tq["event_time"]
                 gaps.append(f"event_time: {hit.get('source')} 只给到日期，"

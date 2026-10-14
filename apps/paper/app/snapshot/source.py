@@ -47,7 +47,9 @@ from app.market_time import UnknownMarket, canonical_market, market_of
 CST = ZoneInfo("Asia/Shanghai")
 
 # 拉一次行情的超时。论文里这是执行区里最不该久等的一步：超时 = 断流 = 不成交。
-DEFAULT_TIMEOUT_S = 3.0
+# 拉一次行情的超时。api 内部行情端点 = 官方 hunter 网关 + 腾讯补盘中时刻，实测约 6s；
+# 3s 会把「慢但能拿到」误判成断流 → paper 无快照 → 拒单。调到 12s 覆盖该链路。
+DEFAULT_TIMEOUT_S = 12.0
 
 
 def _dec(value: Any) -> Optional[Decimal]:
