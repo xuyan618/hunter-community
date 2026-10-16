@@ -105,7 +105,7 @@ sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
 
   echo "$(date '+%H:%M:%S')   -- 构建源码镜像（分层缓存，仅改动层重跑；npm 等若需联网请确认服务器可达）--"
   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml \
-    build "${SOURCE_SERVICES[@]}"
+    build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple "${SOURCE_SERVICES[@]}"
 REMOTE
 
 # ─── 3) 启动 / 重建全部服务 ──────────────────────────
@@ -153,12 +153,12 @@ sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   bash scripts/fin_provision_paper_role.sh
   # 3) 起官方智能炒股调度(paper + temporal + temporal-ui + fin-worker)
   echo "$(date '+%H:%M:%S')   -- 启动 fin 调度(profile=fin) --"
-  docker compose $COMPOSE_FILES up -d --profile fin
+  docker compose --profile fin $COMPOSE_FILES up -d
 
   echo "  -- 服务状态 --"
   docker compose ps
   echo "  -- fin 调度状态 --"
-  docker compose $COMPOSE_FILES --profile fin ps
+  docker compose --profile fin $COMPOSE_FILES ps
   echo "  -- api 日志尾部 --"
   docker logs --tail 8 "$CID" 2>&1 | sed 's/^/     /'
 REMOTE

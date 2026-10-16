@@ -26,6 +26,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 该给的编译工具还是得给 —— 只是不再让它们进运行层。
 # 构建环境 apt 源走 HTTPS（http 出口被中间设备拦截时 build 会失败）
 RUN for f in $(grep -rl 'http://deb.debian.org' /etc/apt 2>/dev/null); do sed -i 's#http://deb.debian.org#https://deb.debian.org#g' "$f"; done
+RUN find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -exec sed -i 's#deb.debian.org/debian#mirrors.tuna.tsinghua.edu.cn/debian#g' {} +
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
@@ -55,6 +56,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 注意:psycopg2-binary 自带 libpq,所以运行层不需要 libpq-dev / libpq5。
 # 构建环境 apt 源走 HTTPS（http 出口被中间设备拦截时 build 会失败）
 RUN for f in $(grep -rl 'http://deb.debian.org' /etc/apt 2>/dev/null); do sed -i 's#http://deb.debian.org#https://deb.debian.org#g' "$f"; done
+RUN find /etc/apt -type f \( -name 'sources.list' -o -name '*.sources' \) -exec sed -i 's#deb.debian.org/debian#mirrors.tuna.tsinghua.edu.cn/debian#g' {} +
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
