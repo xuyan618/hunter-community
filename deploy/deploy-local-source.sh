@@ -20,8 +20,8 @@ set -euo pipefail
 
 # ─── 配置 ───────────────────────────────────────────────
 DEPLOY_HOST="${DEPLOY_HOST:-10.98.136.105}"
-DEPLOY_USER="${DEPLOY_USER:-xuyan}"
-DEPLOY_PATH="${DEPLOY_PATH:-/Users/xuyan/Desktop/hunter-community}"
+DEPLOY_USER="${DEPLOY_USER:-umpay}"
+DEPLOY_PATH="${DEPLOY_PATH:-/Users/umpay/Desktop/hunter-community}"
 LOCAL_REPO="${LOCAL_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
 SOURCE_SERVICES=(api web opencode llm-shim paper fin-worker)
 
@@ -74,7 +74,7 @@ echo "$(ts) ==> [2/4] 在服务器本地从源码构建镜像（基础镜像走�
 sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   DEPLOY_PATH="$DEPLOY_PATH" bash -s <<'REMOTE'
   export PATH=/usr/local/bin:$PATH
-  export DOCKER_HOST=unix:///Users/xuyan/.docker/run/docker.sock
+  export DOCKER_HOST=unix:///Users/umpay/.docker/run/docker.sock
   cd "$DEPLOY_PATH"
 
   echo "$(date '+%H:%M:%S')   -- 确保基础镜像本地标签存在（缺失则从 daocloud 镜像 tag）--"
@@ -113,7 +113,7 @@ echo "$(ts) ==> [3/4] 启动 / 重建全部服务"
 sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   DEPLOY_PATH="$DEPLOY_PATH" bash -s <<'REMOTE'
   export PATH=/usr/local/bin:$PATH
-  export DOCKER_HOST=unix:///Users/xuyan/.docker/run/docker.sock
+  export DOCKER_HOST=unix:///Users/umpay/.docker/run/docker.sock
   cd "$DEPLOY_PATH"
   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up -d
 REMOTE
@@ -123,7 +123,7 @@ echo "$(ts) ==> [4/4] 健康检查（等待 api 变为 healthy）并启用官方
 sshpass -e ssh "${SSH_OPTS[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
   DEPLOY_PATH="$DEPLOY_PATH" bash -s <<'REMOTE'
   export PATH=/usr/local/bin:$PATH
-  export DOCKER_HOST=unix:///Users/xuyan/.docker/run/docker.sock
+  export DOCKER_HOST=unix:///Users/umpay/.docker/run/docker.sock
   cd "$DEPLOY_PATH"
   COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml"
 
